@@ -20,7 +20,21 @@
   <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useRef } = React;
+const { useState, useRef, useEffect } = React;
+
+// ─── LOCALSTORAGE HOOK ────────────────────────────────────────────────────────
+function useLocalStorage(key, defaultValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultValue;
+    } catch { return defaultValue; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
 
 // ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
 const T = {
@@ -335,7 +349,7 @@ function Cotisations({ t, tenants, payments, setPayments, isAdmin, C, cardStyle 
                 const bal = total-due;
                 return (
                   <tr key={ten.id} style={{ borderBottom:`1px solid #1e293b` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600, whiteSpace:"nowrap" }}>{ten.name}<br/><span style={{ fontSize:11, color:C.accent, fontWeight:400 }}>{ten.apt}</span></td>
+                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600, whiteSpace:"nowrap" }}>{isAdmin ? `${ten.name} ${ten.firstname}` : ten.apt}<br/><span style={{ fontSize:11, color:C.accent, fontWeight:400 }}>{ten.apt}</span></td>
                     {MONTHS.map(m=>{
                       const mp = payments.filter(p=>p.tenantId===ten.id&&p.month===m);
                       const amt = mp.reduce((s,p)=>s+p.amount,0);
@@ -665,22 +679,28 @@ function App() {
   const [pwError, setPwError] = useState(false);
   const [tab, setTab] = useState("dashboard");
 
-  const [tenants, setTenants] = useState(initTenants);
-  const [payments, setPayments] = useState([]);
-  const [depenses, setDepenses] = useState([
+  const [tenants, setTenants] = useLocalStorage("imm_tenants", initTenants());
+  const [payments, setPayments] = useLocalStorage("imm_payments", []);
+  const [depenses, setDepenses] = useLocalStorage("imm_depenses", [
     { id:1, designation:"Ampoules hall + escaliers", amount:4500, date:"2026-03-15", category:"Électricité", photo:null, note:"" },
     { id:2, designation:"Produits nettoyage", amount:2000, date:"2026-02-10", category:"Nettoyage", photo:null, note:"" },
     { id:3, designation:"Réparation interphone", amount:8000, date:"2026-01-20", category:"Entretien", photo:null, note:"" },
   ]);
-  const [votes, setVotes] = useState([
+  const [votes, setVotes] = useLocalStorage("imm_votes", [
     { id:1, question:"Installer une caméra de surveillance à l'entrée", description:"Améliorer la sécurité de l'immeuble", options:["Oui, je suis pour","Non, je suis contre"], votes:{0:[],1:[]}, deadline:"2026-06-30", closed:false },
   ]);
-  const [annonces, setAnnonces] = useState(SAMPLE_ANNOUNCEMENTS);
+  const [annonces, setAnnonces] = useLocalStorage("imm_annonces", SAMPLE_ANNOUNCEMENTS);
 
   function tryLogin() {
     if (ADMIN_PASSWORDS.includes(pwInput.trim())) {
       setIsAdmin(true); setShowLogin(false); setPwInput(""); setPwError(false);
     } else { setPwError(true); }
+  }
+
+  // Si on se déconnecte et qu'on est sur un onglet admin-only → retour dashboard
+  function doLogout() {
+    setIsAdmin(false);
+    if (["tenants","depenses"].includes(tab)) setTab("dashboard");
   }
 
   const C = {
@@ -727,7 +747,7 @@ function App() {
           {isAdmin ? (
             <>
               <span style={{ background:C.accent+"22", color:C.accent, border:`1px solid ${C.accent}44`, borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>⚙️ {t.adminMode}</span>
-              <button onClick={()=>setIsAdmin(false)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:20, padding:"4px 14px", cursor:"pointer", fontSize:13 }}>{t.logout}</button>
+              <button onClick={doLogout} style={{ background:"#334155", border:"none", color:C.text, borderRadius:20, padding:"4px 14px", cursor:"pointer", fontSize:13 }}>{t.logout}</button>
             </>
           ) : (
             <>
@@ -740,11 +760,15 @@ function App() {
 
       {/* NAV */}
       <nav style={{ background:C.card, borderBottom:`1px solid ${C.border}`, display:"flex", gap:4, padding:"6px 12px", overflowX:"auto" }}>
-        {Object.entries(t.nav).map(([key,label])=>(
-          <button key={key} onClick={()=>setTab(key)} style={{ background:tab===key?C.accent:"transparent", color:tab===key?"#0f172a":C.sub, border:"none", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:tab===key?700:400, fontSize:13, whiteSpace:"nowrap", transition:"all .15s" }}>
-            {{"dashboard":"📊","tenants":"👥","cotisations":"💰","depenses":"🛒","votes":"🗳️","annonces":"📢"}[key]} {label}
-          </button>
-        ))}
+        {Object.entries(t.nav).map(([key,label])=>{
+          const adminOnly = ["tenants","depenses"];
+          if (!isAdmin && adminOnly.includes(key)) return null;
+          return (
+            <button key={key} onClick={()=>setTab(key)} style={{ background:tab===key?C.accent:"transparent", color:tab===key?"#0f172a":C.sub, border:"none", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:tab===key?700:400, fontSize:13, whiteSpace:"nowrap", transition:"all .15s" }}>
+              {{"dashboard":"📊","tenants":"👥","cotisations":"💰","depenses":"🛒","votes":"🗳️","annonces":"📢"}[key]} {label}
+            </button>
+          );
+        })}
       </nav>
 
       {/* CONTENT */}
