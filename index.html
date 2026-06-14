@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0f172a; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; }
@@ -18,243 +19,182 @@
 </head>
 <body>
   <div id="root"></div>
-
 <script type="text/babel">
 const { useState, useRef, useEffect } = React;
 
-// ─── LOCALSTORAGE HOOK ────────────────────────────────────────────────────────
-function useLocalStorage(key, defaultValue) {
-  const [value, setValue] = useState(() => {
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : defaultValue;
-    } catch { return defaultValue; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-  }, [key, value]);
-  return [value, setValue];
-}
+const SUPA_URL = "https://zablwzxrryrutfqukfve.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphYmx3enhycnlydXRmcXVrZnZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNzQwMjgsImV4cCI6MjA5Njk1MDAyOH0.2ZijXLnOZ2JJXuYmvXC3hqYGdQQpLYbeonhamGSrBQY";
+const supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
-const T = {
-  fr: {
-    appTitle: "Gestion Immeuble",
-    appSubtitle: "Caisse & Cotisations",
-    login: "Connexion Administrateur",
-    loginBtn: "Se connecter",
-    logout: "Déconnexion",
-    password: "Mot de passe",
-    wrongPassword: "Mot de passe incorrect",
-    adminMode: "Mode Administrateur",
-    viewMode: "Mode Consultation",
-    nav: { dashboard:"Tableau de bord", tenants:"Locataires", cotisations:"Cotisations", depenses:"Dépenses", votes:"Sondages", annonces:"Annonces" },
-    dashboard: { title:"Vue d'ensemble", totalCollected:"Total collecté", totalDue:"Total dû (juin–déc)", totalSpent:"Total dépensé", balance:"Solde disponible", paidTenants:"Locataires à jour", pendingTenants:"Avec arriéré", activeVotes:"Votes en cours", recentAnnouncement:"Dernière annonce" },
-    tenants: { title:"Liste des Locataires", add:"Ajouter locataire", name:"Nom", firstname:"Prénom", phone:"Téléphone", apt:"Appartement", floor:"Étage", balance:"Solde", actions:"Actions", edit:"Modifier", delete:"Supprimer", save:"Enregistrer", cancel:"Annuler", confirm_delete:"Supprimer ce locataire ?", priorCredit:"Crédit antérieur (avant juin)" },
-    cotisations: { title:"Cotisations", subtitle:"Juin – Décembre 2026 · 1000 DA/mois", addPayment:"Ajouter paiement", tenant:"Locataire", month:"Mois", amount:"Montant (DA)", date:"Date", note:"Note", save:"Enregistrer", cancel:"Annuler", paid:"Payé", partial:"Partiel", unpaid:"Non payé", advance:"Avance", months:["Juin","Juil.","Août","Sept.","Oct.","Nov.","Déc."], monthsFull:["Juin 2026","Juillet 2026","Août 2026","Septembre 2026","Octobre 2026","Novembre 2026","Décembre 2026"], history:"Historique des paiements", filterTenant:"Filtrer par locataire", allTenants:"Tous les locataires", prior:"Période antérieure (jan–mai 2026)" },
-    depenses: { title:"Dépenses & Achats", add:"Ajouter dépense", designation:"Désignation", amount:"Montant (DA)", date:"Date", category:"Catégorie", photo:"Photo / Facture", addPhoto:"Ajouter photo", note:"Note", save:"Enregistrer", cancel:"Annuler", categories:["Entretien","Nettoyage","Électricité","Plomberie","Sécurité","Divers"], noPhoto:"Aucune photo", viewPhoto:"Voir la facture" },
-    votes: { title:"Sondages & Votes", add:"Créer un vote", question:"Question / Proposition", description:"Description", options:"Options", addOption:"Ajouter option", deadline:"Date limite", status:"Statut", open:"Ouvert", closed:"Clôturé", votes_count:"voix", vote:"Voter", voted:"Voté", results:"Résultats", close:"Clôturer", save:"Créer", cancel:"Annuler", majority:"Majorité requise : 19 voix", winner:"Résultat", approved:"✅ Approuvé", rejected:"❌ Rejeté" },
-    annonces: { title:"Annonces", add:"Nouvelle annonce", messageTitle:"Titre", message:"Message", urgent:"Urgent", normal:"Normal", priority:"Priorité", save:"Publier", cancel:"Annuler", share:"Partager (WhatsApp)", shareMsg:"📢 ANNONCE IMMEUBLE :\n", urgentBadge:"⚡ URGENT" },
-    months_full: ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"],
-  },
-  ar: {
-    appTitle: "إدارة العمارة",
-    appSubtitle: "الصندوق والاشتراكات",
-    login: "دخول المسؤول",
-    loginBtn: "دخول",
-    logout: "خروج",
-    password: "كلمة المرور",
-    wrongPassword: "كلمة المرور غير صحيحة",
-    adminMode: "وضع المسؤول",
-    viewMode: "وضع العرض",
-    nav: { dashboard:"لوحة القيادة", tenants:"السكان", cotisations:"الاشتراكات", depenses:"المصاريف", votes:"الاستطلاعات", annonces:"الإعلانات" },
-    dashboard: { title:"نظرة عامة", totalCollected:"المجموع المحصل", totalDue:"المجموع المستحق", totalSpent:"المجموع المصروف", balance:"الرصيد المتاح", paidTenants:"السكان المنتظمون", pendingTenants:"لديهم متأخرات", activeVotes:"تصويتات جارية", recentAnnouncement:"آخر إعلان" },
-    tenants: { title:"قائمة السكان", add:"إضافة ساكن", name:"اللقب", firstname:"الاسم", phone:"الهاتف", apt:"الشقة", floor:"الطابق", balance:"الرصيد", actions:"إجراءات", edit:"تعديل", delete:"حذف", save:"حفظ", cancel:"إلغاء", confirm_delete:"حذف هذا الساكن؟", priorCredit:"رصيد سابق (قبل جوان)" },
-    cotisations: { title:"الاشتراكات", subtitle:"جوان – ديسمبر 2026 · 1000 دج/شهر", addPayment:"إضافة دفعة", tenant:"الساكن", month:"الشهر", amount:"المبلغ (دج)", date:"التاريخ", note:"ملاحظة", save:"حفظ", cancel:"إلغاء", paid:"مدفوع", partial:"جزئي", unpaid:"غير مدفوع", advance:"مسبق", months:["جوان","جويل.","أوت","سبت.","أكت.","نوف.","ديس."], monthsFull:["جوان 2026","جويلية 2026","أوت 2026","سبتمبر 2026","أكتوبر 2026","نوفمبر 2026","ديسمبر 2026"], history:"سجل الدفعات", filterTenant:"تصفية حسب الساكن", allTenants:"جميع السكان", prior:"الفترة السابقة (جان–ماي 2026)" },
-    depenses: { title:"المصاريف والمشتريات", add:"إضافة مصروف", designation:"التسمية", amount:"المبلغ (دج)", date:"التاريخ", category:"الفئة", photo:"صورة / فاتورة", addPhoto:"إضافة صورة", note:"ملاحظة", save:"حفظ", cancel:"إلغاء", categories:["صيانة","تنظيف","كهرباء","سباكة","أمن","متنوع"], noPhoto:"لا توجد صورة", viewPhoto:"عرض الفاتورة" },
-    votes: { title:"الاستطلاعات والتصويتات", add:"إنشاء تصويت", question:"السؤال / المقترح", description:"الوصف", options:"الخيارات", addOption:"إضافة خيار", deadline:"تاريخ الانتهاء", status:"الحالة", open:"مفتوح", closed:"مغلق", votes_count:"أصوات", vote:"تصويت", voted:"تم التصويت", results:"النتائج", close:"إغلاق", save:"إنشاء", cancel:"إلغاء", majority:"الأغلبية المطلوبة: 19 صوت", winner:"النتيجة", approved:"✅ موافق عليه", rejected:"❌ مرفوض" },
-    annonces: { title:"الإعلانات", add:"إعلان جديد", messageTitle:"العنوان", message:"الرسالة", urgent:"عاجل", normal:"عادي", priority:"الأولوية", save:"نشر", cancel:"إلغاء", share:"مشاركة (واتساب)", shareMsg:"📢 إعلان العمارة:\n", urgentBadge:"⚡ عاجل" },
-    months_full: ["جانفي","فيفري","مارس","أفريل","ماي","جوان","جويلية","أوت","سبتمبر","أكتوبر","نوفمبر","ديسمبر"],
-  }
-};
-
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORDS = ["admin123","admin456","admin789"];
-const MONTHS = ["juin","juillet","aout","septembre","octobre","novembre","decembre"];
-const MONTHS_PRIOR = ["janvier","fevrier","mars","avril","mai"];
+const FLOORS = ["RDC","1er","2ème","3ème","4ème","5ème","6ème","7ème","8ème","9ème"];
 
-const initTenants = () => {
-  const floors = [["RDC","0"],["1er","1"],["2ème","2"],["3ème","3"],["4ème","4"],["5ème","5"],["6ème","6"],["7ème","7"],["8ème","8"]];
-  const tenants = [];
+function initTenants() {
+  const list = [];
   let id = 1;
-  for (let f = 0; f < floors.length; f++) {
-    const count = f === 0 ? 5 : 4;
-    for (let a = 1; a <= count; a++) {
-      tenants.push({ id: id++, name:`Locataire ${id-1}`, firstname:"", phone:"", apt:`${floors[f][0]}-${String(a).padStart(2,"0")}`, floor:floors[f][1], priorCredit:0 });
+  // RDC: 2 apparts
+  for (let a = 1; a <= 2; a++) {
+    list.push({ id: id++, name:"", firstname:"", phone:"", apt:`RDC-0${a}`, floor:"0", priorCredit:0 });
+  }
+  // Étages 1 à 9: 4 apparts chacun
+  for (let f = 1; f <= 9; f++) {
+    for (let a = 1; a <= 4; a++) {
+      list.push({ id: id++, name:"", firstname:"", phone:"", apt:`${FLOORS[f]}-0${a}`, floor:String(f), priorCredit:0 });
     }
   }
-  return tenants.slice(0,37);
-};
-
-const SAMPLE_ANNOUNCEMENTS = [
-  { id:1, title:"Réunion des copropriétaires", message:"Réunion le 20 juin à 18h dans le hall de l'immeuble. Présence obligatoire.", urgent:true, date:"2026-06-10" },
-  { id:2, title:"Coupure d'eau", message:"Coupure d'eau programmée le 15 juin de 8h à 14h pour travaux de plomberie.", urgent:false, date:"2026-06-09" },
-];
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function getTenantBalance(tenantId, payments, tenants) {
-  const tenant = tenants.find(t => t.id === tenantId);
-  const prior = tenant?.priorCredit || 0;
-  const total = payments.filter(p => p.tenantId === tenantId).reduce((s,p) => s+p.amount, 0);
-  const due = MONTHS.length * 1000;
-  return prior + total - due;
+  return list; // 2 + 36 = 38 locataires
 }
 
+async function loadDB() {
+  const [t, p, d, v, a] = await Promise.all([
+    supabase.from("tenants").select("*").order("id"),
+    supabase.from("payments").select("*").order("id"),
+    supabase.from("depenses").select("*").order("id", {ascending:false}),
+    supabase.from("votes").select("*").order("id"),
+    supabase.from("annonces").select("*").order("id", {ascending:false}),
+  ]);
+  return { tenants:t.data||[], payments:p.data||[], depenses:d.data||[], votes:v.data||[], annonces:a.data||[] };
+}
+
+// ─── COLORS ───────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#0f172a", card:"#1e293b", border:"#334155",
+  accent:"#38bdf8", accent2:"#818cf8",
+  text:"#f1f5f9", sub:"#94a3b8",
+  green:"#22c55e", red:"#ef4444", amber:"#f59e0b",
+};
+const cardStyle = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:16, marginBottom:12 };
+const inputStyle = { padding:"8px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
+const btnStyle = (color="#334155", textColor=C.text) => ({ background:color, border:"none", color:textColor, borderRadius:6, padding:"7px 14px", cursor:"pointer", fontWeight:600, fontSize:13 });
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({ t, tenants, payments, depenses, votes, annonces, C, cardStyle }) {
-  const totalCollected = payments.reduce((s,p)=>s+p.amount,0) + tenants.reduce((s,tn)=>s+(tn.priorCredit||0),0);
-  const totalDue = tenants.length * MONTHS.length * 1000;
-  const totalSpent = depenses.reduce((s,d)=>s+d.amount,0);
-  const balance = totalCollected - totalSpent;
+function Dashboard({ tenants, payments, depenses, votes, annonces }) {
+  const totalPaid = payments.reduce((s,p)=>s+Number(p.amount),0) + tenants.reduce((s,t)=>s+Number(t.priorCredit||0),0);
+  const totalSpent = depenses.reduce((s,d)=>s+Number(d.amount),0);
+  const caisse = totalPaid - totalSpent;
   const openVotes = votes.filter(v=>!v.closed).length;
   const lastAnnonce = annonces[0];
-  const paidCount = tenants.filter(ten =>
-    MONTHS.every(m => payments.filter(p=>p.tenantId===ten.id&&p.month===m).reduce((s,p)=>s+p.amount,0) >= 1000)
-  ).length;
+
+  // Locataires à jour = ceux dont solde >= 0
+  const paidCount = tenants.filter(ten => {
+    const paid = payments.filter(p=>p.tenantId===ten.id).reduce((s,p)=>s+Number(p.amount),0) + Number(ten.priorCredit||0);
+    const due = payments.filter(p=>p.tenantId===ten.id).length > 0 ? 0 : 0; // basé sur paiements réels
+    return paid > 0;
+  }).length;
 
   const stats = [
-    { label:t.dashboard.totalCollected, value:`${totalCollected.toLocaleString()} DA`, color:C.green, icon:"💵" },
-    { label:t.dashboard.totalDue, value:`${totalDue.toLocaleString()} DA`, color:C.accent, icon:"📋" },
-    { label:t.dashboard.totalSpent, value:`${totalSpent.toLocaleString()} DA`, color:C.amber, icon:"🛒" },
-    { label:t.dashboard.balance, value:`${balance.toLocaleString()} DA`, color:balance>=0?C.green:C.red, icon:"🏦" },
-    { label:t.dashboard.paidTenants, value:`${paidCount} / ${tenants.length}`, color:C.green, icon:"✅" },
-    { label:t.dashboard.pendingTenants, value:`${tenants.length - paidCount}`, color:C.amber, icon:"⏳" },
-    { label:t.dashboard.activeVotes, value:`${openVotes}`, color:C.accent2, icon:"🗳️" },
+    { label:"Total encaissé", value:`${totalPaid.toLocaleString()} DA`, color:C.green, icon:"💵" },
+    { label:"Total dépensé", value:`${totalSpent.toLocaleString()} DA`, color:C.amber, icon:"🛒" },
+    { label:"💰 Solde caisse", value:`${caisse.toLocaleString()} DA`, color:caisse>=0?C.green:C.red, icon:"🏦", big:true },
+    { label:"Locataires (ont payé)", value:`${paidCount} / ${tenants.length}`, color:C.green, icon:"✅" },
+    { label:"Votes en cours", value:`${openVotes}`, color:C.accent2, icon:"🗳️" },
   ];
 
   return (
     <div>
-      <h2 style={{ color:C.text, marginTop:0 }}>📊 {t.dashboard.title}</h2>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:12, marginBottom:20 }}>
+      <h2 style={{ color:C.text, marginBottom:16 }}>📊 Vue d'ensemble</h2>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:10, marginBottom:16 }}>
         {stats.map((s,i)=>(
-          <div key={i} style={{ ...cardStyle, margin:0, borderLeft:`4px solid ${s.color}` }}>
-            <div style={{ fontSize:22, marginBottom:4 }}>{s.icon}</div>
-            <div style={{ fontSize:20, fontWeight:800, color:s.color }}>{s.value}</div>
-            <div style={{ fontSize:12, color:"#94a3b8", marginTop:2 }}>{s.label}</div>
+          <div key={i} style={{ ...cardStyle, margin:0, borderLeft:`4px solid ${s.color}`, padding:14 }}>
+            <div style={{ fontSize:20, marginBottom:4 }}>{s.icon}</div>
+            <div style={{ fontSize:s.big?22:18, fontWeight:800, color:s.color }}>{s.value}</div>
+            <div style={{ fontSize:11, color:C.sub, marginTop:2 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {lastAnnonce && (
-        <div style={{ ...cardStyle, borderLeft:`4px solid ${lastAnnonce.urgent?C.red:C.accent}`, background:lastAnnonce.urgent?"#7f1d1d22":C.card }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-            <span style={{ fontSize:18 }}>📢</span>
-            <span style={{ fontWeight:700, color:C.text }}>{t.dashboard.recentAnnouncement}</span>
-            {lastAnnonce.urgent && <span style={{ background:C.red, color:"#fff", borderRadius:4, padding:"1px 8px", fontSize:11, fontWeight:700 }}>{t.annonces.urgentBadge}</span>}
+        <div style={{ ...cardStyle, borderLeft:`4px solid ${lastAnnonce.urgent?C.red:C.accent}` }}>
+          <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6, flexWrap:"wrap" }}>
+            <span style={{ fontSize:16 }}>📢</span>
+            <span style={{ fontWeight:700, color:C.text }}>Dernière annonce</span>
+            {lastAnnonce.urgent && <span style={{ background:C.red, color:"#fff", borderRadius:4, padding:"1px 8px", fontSize:11, fontWeight:700 }}>⚡ URGENT</span>}
           </div>
           <div style={{ fontWeight:600, color:C.text }}>{lastAnnonce.title}</div>
           <div style={{ color:C.sub, fontSize:13, marginTop:4 }}>{lastAnnonce.message}</div>
         </div>
       )}
-
-      <div style={cardStyle}>
-        <div style={{ fontWeight:700, marginBottom:12, color:C.text }}>💰 {t.cotisations.title} — {t.cotisations.subtitle}</div>
-        {MONTHS.map((m,i)=>{
-          const collected = payments.filter(p=>p.month===m).reduce((s,p)=>s+p.amount,0);
-          const target = tenants.length * 1000;
-          const pct = Math.min(100, Math.round((collected/target)*100));
-          return (
-            <div key={m} style={{ marginBottom:8 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.sub, marginBottom:3 }}>
-                <span>{t.cotisations.months[i]}</span>
-                <span>{collected.toLocaleString()} / {target.toLocaleString()} DA ({pct}%)</span>
-              </div>
-              <div style={{ background:"#334155", borderRadius:4, height:8 }}>
-                <div style={{ background:pct>=100?C.green:pct>50?C.amber:C.red, width:`${pct}%`, height:8, borderRadius:4, transition:"width .3s" }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
 
 // ─── TENANTS ──────────────────────────────────────────────────────────────────
-function Tenants({ t, tenants, setTenants, isAdmin, C, cardStyle }) {
+function Tenants({ tenants, payments, isAdmin, onAdd, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name:"", firstname:"", phone:"", apt:"", floor:"0", priorCredit:0 });
 
-  const inputStyle = { padding:"6px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
-  const floors = ["RDC","1er","2ème","3ème","4ème","5ème","6ème","7ème","8ème"];
-
   function startAdd() { setForm({ name:"", firstname:"", phone:"", apt:"", floor:"0", priorCredit:0 }); setAdding(true); setEditing(null); }
   function startEdit(ten) { setForm({...ten}); setEditing(ten.id); setAdding(false); }
-  function saveAdd() {
-    if (!form.name.trim()) return;
-    setTenants(prev=>[...prev, { ...form, id:Date.now(), priorCredit:Number(form.priorCredit)||0 }]);
-    setAdding(false);
+  async function saveAdd() { if (!form.apt.trim()) return; await onAdd({...form, priorCredit:Number(form.priorCredit)||0}); setAdding(false); }
+  async function saveEdit() { await onUpdate(editing, {...form, priorCredit:Number(form.priorCredit)||0}); setEditing(null); }
+  async function del(id) { if(window.confirm("Supprimer ce locataire ?")) await onDelete(id); }
+
+  // Calcul solde par locataire
+  function getSolde(ten) {
+    const paid = payments.filter(p=>p.tenantId===ten.id).reduce((s,p)=>s+Number(p.amount),0) + Number(ten.priorCredit||0);
+    // Total dû = sum des montants dus enregistrés (on utilise les paiements comme référence)
+    return paid;
   }
-  function saveEdit() {
-    setTenants(prev=>prev.map(tn=>tn.id===editing?{...tn,...form,priorCredit:Number(form.priorCredit)||0}:tn));
-    setEditing(null);
-  }
-  function del(id) { if(window.confirm(t.tenants.confirm_delete)) setTenants(prev=>prev.filter(tn=>tn.id!==id)); }
 
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:8 }}>
-        <h2 style={{ margin:0, color:C.text }}>👥 {t.tenants.title} ({tenants.length})</h2>
-        {isAdmin && <button onClick={startAdd} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:8, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ {t.tenants.add}</button>}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+        <h2 style={{ margin:0, color:C.text }}>👥 Locataires ({tenants.length})</h2>
+        {isAdmin && <button onClick={startAdd} style={btnStyle(C.accent,"#0f172a")}>+ Ajouter</button>}
       </div>
 
       {(adding || editing) && (
         <div style={{ ...cardStyle, borderColor:C.accent }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.tenants.name}</label><input style={inputStyle} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.tenants.firstname}</label><input style={inputStyle} value={form.firstname} onChange={e=>setForm(f=>({...f,firstname:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.tenants.phone}</label><input style={inputStyle} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.tenants.apt}</label><input style={inputStyle} value={form.apt} onChange={e=>setForm(f=>({...f,apt:e.target.value}))} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+            <div><label style={{ fontSize:11, color:C.sub }}>Nom</label><input style={inputStyle} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Prénom</label><input style={inputStyle} value={form.firstname} onChange={e=>setForm(f=>({...f,firstname:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Téléphone</label><input style={inputStyle} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Appartement</label><input style={inputStyle} value={form.apt} onChange={e=>setForm(f=>({...f,apt:e.target.value}))} /></div>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.tenants.floor}</label>
+              <label style={{ fontSize:11, color:C.sub }}>Étage</label>
               <select style={inputStyle} value={form.floor} onChange={e=>setForm(f=>({...f,floor:e.target.value}))}>
-                {floors.map((fl,i)=><option key={i} value={String(i)}>{fl}</option>)}
+                {FLOORS.map((fl,i)=><option key={i} value={String(i)}>{fl}</option>)}
               </select>
             </div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.tenants.priorCredit} (DA)</label><input type="number" style={inputStyle} value={form.priorCredit} onChange={e=>setForm(f=>({...f,priorCredit:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Crédit antérieur (DA)</label><input type="number" style={inputStyle} value={form.priorCredit} onChange={e=>setForm(f=>({...f,priorCredit:e.target.value}))} /></div>
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={adding?saveAdd:saveEdit} style={{ background:C.green, border:"none", color:"#fff", borderRadius:6, padding:"7px 18px", fontWeight:700, cursor:"pointer" }}>{t.tenants.save}</button>
-            <button onClick={()=>{setAdding(false);setEditing(null)}} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 18px", cursor:"pointer" }}>{t.tenants.cancel}</button>
+            <button onClick={adding?saveAdd:saveEdit} style={btnStyle(C.green,"#fff")}>💾 Enregistrer</button>
+            <button onClick={()=>{setAdding(false);setEditing(null)}} style={btnStyle()}>Annuler</button>
           </div>
         </div>
       )}
 
       <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
           <thead>
             <tr style={{ background:"#334155" }}>
-              {[t.tenants.name, t.tenants.firstname, t.tenants.apt, t.tenants.floor, t.tenants.phone, t.tenants.priorCredit+" (DA)", isAdmin&&t.tenants.actions].filter(Boolean).map((h,i)=>(
-                <th key={i} style={{ padding:"10px 12px", color:C.sub, fontWeight:600, textAlign:"left", borderBottom:`1px solid #475569`, whiteSpace:"nowrap" }}>{h}</th>
+              {["Apt","Étage","Nom","Prénom","Téléphone","Crédit ant.","Total payé", isAdmin&&"Actions"].filter(Boolean).map((h,i)=>(
+                <th key={i} style={{ padding:"9px 10px", color:C.sub, textAlign:"left", borderBottom:`1px solid #475569`, whiteSpace:"nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {tenants.map(ten=>(
-              <tr key={ten.id} style={{ borderBottom:`1px solid #1e293b` }}>
-                <td style={{ padding:"9px 12px", color:C.text, fontWeight:600 }}>{ten.name}</td>
-                <td style={{ padding:"9px 12px", color:C.sub }}>{ten.firstname}</td>
-                <td style={{ padding:"9px 12px", color:C.accent }}>{ten.apt}</td>
-                <td style={{ padding:"9px 12px", color:C.sub }}>{floors[Number(ten.floor)]||ten.floor}</td>
-                <td style={{ padding:"9px 12px", color:C.sub }}>{ten.phone||"—"}</td>
-                <td style={{ padding:"9px 12px", color:ten.priorCredit>0?C.green:C.sub }}>{ten.priorCredit>0?`+${Number(ten.priorCredit).toLocaleString()}`:0}</td>
-                {isAdmin && <td style={{ padding:"9px 12px" }}>
-                  <button onClick={()=>startEdit(ten)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:4, padding:"3px 10px", cursor:"pointer", marginRight:4, fontSize:12 }}>✏️</button>
-                  <button onClick={()=>del(ten.id)} style={{ background:"#7f1d1d", border:"none", color:"#fca5a5", borderRadius:4, padding:"3px 10px", cursor:"pointer", fontSize:12 }}>🗑️</button>
-                </td>}
-              </tr>
-            ))}
+            {tenants.map(ten=>{
+              const totalPaid = payments.filter(p=>p.tenantId===ten.id).reduce((s,p)=>s+Number(p.amount),0);
+              const total = totalPaid + Number(ten.priorCredit||0);
+              return (
+                <tr key={ten.id} style={{ borderBottom:`1px solid #1e293b` }}>
+                  <td style={{ padding:"8px 10px", color:C.accent, fontWeight:700 }}>{ten.apt}</td>
+                  <td style={{ padding:"8px 10px", color:C.sub }}>{FLOORS[Number(ten.floor)]}</td>
+                  <td style={{ padding:"8px 10px", color:C.text }}>{ten.name||"—"}</td>
+                  <td style={{ padding:"8px 10px", color:C.sub }}>{ten.firstname||"—"}</td>
+                  <td style={{ padding:"8px 10px", color:C.sub }}>{ten.phone||"—"}</td>
+                  <td style={{ padding:"8px 10px", color:Number(ten.priorCredit)>0?C.green:C.sub }}>{Number(ten.priorCredit||0).toLocaleString()}</td>
+                  <td style={{ padding:"8px 10px", color:total>0?C.green:C.sub, fontWeight:700 }}>{total.toLocaleString()} DA</td>
+                  {isAdmin && <td style={{ padding:"8px 10px", whiteSpace:"nowrap" }}>
+                    <button onClick={()=>startEdit(ten)} style={{ ...btnStyle(), padding:"3px 8px", marginRight:4, fontSize:11 }}>✏️</button>
+                    <button onClick={()=>del(ten.id)} style={{ ...btnStyle("#7f1d1d","#fca5a5"), padding:"3px 8px", fontSize:11 }}>🗑️</button>
+                  </td>}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -263,70 +203,72 @@ function Tenants({ t, tenants, setTenants, isAdmin, C, cardStyle }) {
 }
 
 // ─── COTISATIONS ──────────────────────────────────────────────────────────────
-function Cotisations({ t, tenants, payments, setPayments, isAdmin, C, cardStyle }) {
+function Cotisations({ tenants, payments, isAdmin, onAddPayment, onDeletePayment }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ tenantId:"", month:MONTHS[0], amount:1000, date:new Date().toISOString().split("T")[0], note:"" });
-  const [filter, setFilter] = useState("all");
+  const [form, setForm] = useState({ tenantId:"", month:"", amount:1000, date:new Date().toISOString().split("T")[0], note:"" });
   const [view, setView] = useState("grid");
+  const [filterTenant, setFilterTenant] = useState("all");
 
-  const inputStyle = { padding:"7px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
+  // Mois uniques présents dans les paiements
+  const allMonths = [...new Set(payments.map(p=>p.month))].filter(Boolean).sort();
 
-  function savePayment() {
-    if (!form.tenantId || !form.amount) return;
-    setPayments(prev=>[...prev, { ...form, id:Date.now(), tenantId:Number(form.tenantId), amount:Number(form.amount) }]);
+  async function savePayment() {
+    if (!form.tenantId || !form.amount || !form.month) return;
+    await onAddPayment({ ...form, tenantId:Number(form.tenantId), amount:Number(form.amount) });
     setShowForm(false);
+    setForm({ tenantId:"", month:"", amount:1000, date:new Date().toISOString().split("T")[0], note:"" });
   }
 
-  const filteredTenants = filter==="all" ? tenants : tenants.filter(tn=>tn.id===Number(filter));
+  const filteredTenants = filterTenant==="all" ? tenants : tenants.filter(t=>t.id===Number(filterTenant));
+
+  // Calcul solde par locataire
+  function getTenantData(ten) {
+    const tenPay = payments.filter(p=>p.tenantId===ten.id);
+    const totalPaid = tenPay.reduce((s,p)=>s+Number(p.amount),0) + Number(ten.priorCredit||0);
+    return { tenPay, totalPaid };
+  }
 
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:8 }}>
-        <div>
-          <h2 style={{ margin:0, color:C.text }}>💰 {t.cotisations.title}</h2>
-          <div style={{ color:C.sub, fontSize:13 }}>{t.cotisations.subtitle}</div>
-        </div>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          <button onClick={()=>setView(v=>v==="grid"?"history":"grid")} style={{ background:"#334155", border:"none", color:C.text, borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13 }}>
-            {view==="grid"?"📋 "+t.cotisations.history:"📊 Grille"}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+        <h2 style={{ margin:0, color:C.text }}>💰 Cotisations</h2>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          <button onClick={()=>setView(v=>v==="grid"?"history":"grid")} style={btnStyle()}>
+            {view==="grid"?"📋 Historique":"📊 Grille"}
           </button>
-          {isAdmin && <button onClick={()=>setShowForm(true)} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:8, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ {t.cotisations.addPayment}</button>}
+          {isAdmin && <button onClick={()=>setShowForm(true)} style={btnStyle(C.accent,"#0f172a")}>+ Paiement</button>}
         </div>
       </div>
 
       {showForm && (
         <div style={{ ...cardStyle, borderColor:C.accent }}>
-          <h4 style={{ margin:"0 0 12px", color:C.text }}>+ {t.cotisations.addPayment}</h4>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.cotisations.tenant}</label>
+              <label style={{ fontSize:11, color:C.sub }}>Locataire</label>
               <select style={inputStyle} value={form.tenantId} onChange={e=>setForm(f=>({...f,tenantId:e.target.value}))}>
-                <option value="">—</option>
-                {tenants.map(ten=><option key={ten.id} value={ten.id}>{ten.name} {ten.firstname} – {ten.apt}</option>)}
+                <option value="">— Choisir —</option>
+                {tenants.map(ten=><option key={ten.id} value={ten.id}>{ten.apt} {ten.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.cotisations.month}</label>
-              <select style={inputStyle} value={form.month} onChange={e=>setForm(f=>({...f,month:e.target.value}))}>
-                {MONTHS_PRIOR.map((m,i)=><option key={"p"+i} value={m}>{t.months_full[i]} (antérieur)</option>)}
-                {MONTHS.map((m,i)=><option key={m} value={m}>{t.cotisations.monthsFull[i]}</option>)}
-              </select>
+              <label style={{ fontSize:11, color:C.sub }}>Mois (ex: Juin 2026)</label>
+              <input style={inputStyle} placeholder="ex: Juin 2026" value={form.month} onChange={e=>setForm(f=>({...f,month:e.target.value}))} />
             </div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.cotisations.amount}</label><input type="number" style={inputStyle} value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.cotisations.date}</label><input type="date" style={inputStyle} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} /></div>
-            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:12, color:C.sub }}>{t.cotisations.note}</label><input style={inputStyle} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Montant (DA)</label><input type="number" style={inputStyle} value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Date</label><input type="date" style={inputStyle} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} /></div>
+            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:11, color:C.sub }}>Note</label><input style={inputStyle} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} /></div>
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={savePayment} style={{ background:C.green, border:"none", color:"#fff", borderRadius:6, padding:"7px 18px", fontWeight:700, cursor:"pointer" }}>{t.cotisations.save}</button>
-            <button onClick={()=>setShowForm(false)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 18px", cursor:"pointer" }}>{t.cotisations.cancel}</button>
+            <button onClick={savePayment} style={btnStyle(C.green,"#fff")}>💾 Enregistrer</button>
+            <button onClick={()=>setShowForm(false)} style={btnStyle()}>Annuler</button>
           </div>
         </div>
       )}
 
-      <div style={{ marginBottom:12 }}>
-        <select style={{ padding:"7px 10px", borderRadius:6, border:`1px solid #334155`, background:"#1e293b", color:"#f1f5f9", fontSize:13 }} value={filter} onChange={e=>setFilter(e.target.value)}>
-          <option value="all">{t.cotisations.allTenants}</option>
-          {tenants.map(ten=><option key={ten.id} value={ten.id}>{ten.name} {ten.firstname} – {ten.apt}</option>)}
+      <div style={{ marginBottom:10 }}>
+        <select style={{ ...inputStyle, width:"auto" }} value={filterTenant} onChange={e=>setFilterTenant(e.target.value)}>
+          <option value="all">Tous les locataires</option>
+          {tenants.map(ten=><option key={ten.id} value={ten.id}>{ten.apt} {ten.name}</option>)}
         </select>
       </div>
 
@@ -335,57 +277,66 @@ function Cotisations({ t, tenants, payments, setPayments, isAdmin, C, cardStyle 
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
             <thead>
               <tr style={{ background:"#334155" }}>
-                <th style={{ padding:"10px 10px", color:C.sub, textAlign:"left", borderBottom:`1px solid #475569`, minWidth:130 }}>{t.cotisations.tenant}</th>
-                {MONTHS.map((m,i)=><th key={m} style={{ padding:"10px 8px", color:C.sub, textAlign:"center", borderBottom:`1px solid #475569`, minWidth:64 }}>{t.cotisations.months[i]}</th>)}
-                <th style={{ padding:"10px 8px", color:C.sub, textAlign:"right", borderBottom:`1px solid #475569` }}>Total</th>
-                <th style={{ padding:"10px 8px", color:C.sub, textAlign:"right", borderBottom:`1px solid #475569` }}>Solde</th>
+                <th style={{ padding:"9px 10px", color:C.sub, textAlign:"left", borderBottom:`1px solid #475569`, minWidth:90 }}>Apt</th>
+                {allMonths.map(m=>(
+                  <th key={m} style={{ padding:"9px 8px", color:C.sub, textAlign:"center", borderBottom:`1px solid #475569`, minWidth:80, whiteSpace:"nowrap" }}>{m}</th>
+                ))}
+                <th style={{ padding:"9px 8px", color:C.sub, textAlign:"right", borderBottom:`1px solid #475569` }}>Total payé</th>
+                <th style={{ padding:"9px 8px", color:C.sub, textAlign:"right", borderBottom:`1px solid #475569` }}>Statut</th>
               </tr>
             </thead>
             <tbody>
               {filteredTenants.map(ten=>{
-                const tenPay = payments.filter(p=>p.tenantId===ten.id);
-                const total = tenPay.reduce((s,p)=>s+p.amount,0) + (ten.priorCredit||0);
-                const due = MONTHS.length*1000;
-                const bal = total-due;
+                const { tenPay, totalPaid } = getTenantData(ten);
+                const hasPaid = totalPaid > 0;
                 return (
                   <tr key={ten.id} style={{ borderBottom:`1px solid #1e293b` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600, whiteSpace:"nowrap" }}>{isAdmin ? `${ten.name} ${ten.firstname}` : ten.apt}<br/><span style={{ fontSize:11, color:C.accent, fontWeight:400 }}>{ten.apt}</span></td>
-                    {MONTHS.map(m=>{
-                      const mp = payments.filter(p=>p.tenantId===ten.id&&p.month===m);
-                      const amt = mp.reduce((s,p)=>s+p.amount,0);
-                      const status = amt>=1000?"paid":amt>0?"partial":"unpaid";
+                    <td style={{ padding:"8px 10px", fontWeight:700, color:C.accent, whiteSpace:"nowrap" }}>
+                      {ten.apt}<br/><span style={{ fontSize:10, color:C.sub, fontWeight:400 }}>{ten.name}</span>
+                    </td>
+                    {allMonths.map(m=>{
+                      const mp = tenPay.filter(p=>p.month===m);
+                      const amt = mp.reduce((s,p)=>s+Number(p.amount),0);
                       return (
-                        <td key={m} style={{ padding:"8px 6px", textAlign:"center" }}>
-                          <div style={{ background:status==="paid"?"#14532d33":status==="partial"?"#78350f33":"#7f1d1d33", borderRadius:4, padding:"3px 0" }}>
-                            <div style={{ fontSize:11, fontWeight:700, color:status==="paid"?C.green:status==="partial"?C.amber:C.red }}>
-                              {amt>0?amt.toLocaleString():"—"}
-                            </div>
+                        <td key={m} style={{ padding:"6px 6px", textAlign:"center" }}>
+                          <div style={{ background:amt>0?"#14532d33":"#7f1d1d33", borderRadius:4, padding:"3px 4px" }}>
+                            <span style={{ fontSize:11, fontWeight:700, color:amt>0?C.green:C.red }}>
+                              {amt>0?`${amt.toLocaleString()}`:"✗"}
+                            </span>
                           </div>
                         </td>
                       );
                     })}
-                    <td style={{ padding:"8px 10px", textAlign:"right", color:C.text, fontWeight:700 }}>{total.toLocaleString()}</td>
-                    <td style={{ padding:"8px 10px", textAlign:"right", fontWeight:700, color:bal>=0?C.green:C.red }}>{bal>=0?"+":""}{bal.toLocaleString()}</td>
+                    <td style={{ padding:"8px 10px", textAlign:"right", fontWeight:700, color:C.green }}>{totalPaid.toLocaleString()} DA</td>
+                    <td style={{ padding:"8px 10px", textAlign:"right" }}>
+                      <span style={{ background:hasPaid?"#14532d33":"#7f1d1d33", color:hasPaid?C.green:C.red, borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:700 }}>
+                        {hasPaid?"✅ Payé":"❌ Non payé"}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          {allMonths.length===0 && <p style={{ color:C.sub, textAlign:"center", padding:20 }}>Aucun paiement enregistré</p>}
         </div>
       ) : (
         <div>
-          <h4 style={{ color:C.text }}>📋 {t.cotisations.history}</h4>
-          {payments.length===0 ? <p style={{ color:C.sub }}>Aucun paiement enregistré</p> : (
+          <h4 style={{ color:C.text, marginBottom:10 }}>📋 Historique des paiements</h4>
+          {payments.length===0 ? <p style={{ color:C.sub }}>Aucun paiement</p> : (
             [...payments].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{
-              const ten = tenants.find(tn=>tn.id===p.tenantId);
+              const ten = tenants.find(t=>t.id===p.tenantId);
               return (
-                <div key={p.id} style={{ ...cardStyle, margin:"0 0 8px", padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+                <div key={p.id} style={{ ...cardStyle, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8, padding:"10px 14px" }}>
                   <div>
-                    <span style={{ fontWeight:700, color:C.text }}>{ten?.name} {ten?.firstname}</span>
-                    <span style={{ color:C.accent, marginLeft:8, fontSize:12 }}>{ten?.apt}</span>
-                    <div style={{ fontSize:12, color:C.sub, marginTop:2 }}>{p.month} · {p.date} {p.note&&`· ${p.note}`}</div>
+                    <span style={{ fontWeight:700, color:C.text }}>{ten?.apt}</span>
+                    <span style={{ color:C.sub, marginLeft:8, fontSize:12 }}>{ten?.name}</span>
+                    <div style={{ fontSize:12, color:C.sub, marginTop:2 }}>{p.month} · {p.date}{p.note?` · ${p.note}`:""}</div>
                   </div>
-                  <div style={{ fontWeight:800, fontSize:16, color:C.green }}>+{Number(p.amount).toLocaleString()} DA</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ fontWeight:800, fontSize:15, color:C.green }}>+{Number(p.amount).toLocaleString()} DA</span>
+                    {isAdmin && <button onClick={()=>onDeletePayment(p.id)} style={{ ...btnStyle("#7f1d1d","#fca5a5"), padding:"3px 8px", fontSize:11 }}>🗑️</button>}
+                  </div>
                 </div>
               );
             })
@@ -397,65 +348,64 @@ function Cotisations({ t, tenants, payments, setPayments, isAdmin, C, cardStyle 
 }
 
 // ─── DEPENSES ─────────────────────────────────────────────────────────────────
-function Depenses({ t, depenses, setDepenses, isAdmin, C, cardStyle }) {
+function Depenses({ depenses, isAdmin, onAdd, onDelete }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ designation:"", amount:"", date:new Date().toISOString().split("T")[0], category:t.depenses.categories[0], photo:null, note:"" });
+  const [form, setForm] = useState({ designation:"", amount:"", date:new Date().toISOString().split("T")[0], category:"Entretien", photo:null, note:"" });
   const [viewPhoto, setViewPhoto] = useState(null);
   const fileRef = useRef();
-
-  const inputStyle = { padding:"7px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
+  const CATS = ["Entretien","Nettoyage","Électricité","Plomberie","Sécurité","Divers"];
 
   function handlePhoto(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => setForm(f=>({...f, photo:ev.target.result}));
+    reader.onload = ev => setForm(f=>({...f,photo:ev.target.result}));
     reader.readAsDataURL(file);
   }
 
-  function save() {
+  async function save() {
     if (!form.designation.trim() || !form.amount) return;
-    setDepenses(prev=>[{ ...form, id:Date.now(), amount:Number(form.amount) }, ...prev]);
+    await onAdd({...form, amount:Number(form.amount)});
     setShowForm(false);
-    setForm({ designation:"", amount:"", date:new Date().toISOString().split("T")[0], category:t.depenses.categories[0], photo:null, note:"" });
+    setForm({ designation:"", amount:"", date:new Date().toISOString().split("T")[0], category:"Entretien", photo:null, note:"" });
   }
 
-  const total = depenses.reduce((s,d)=>s+d.amount,0);
+  const total = depenses.reduce((s,d)=>s+Number(d.amount),0);
 
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:8 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
         <div>
-          <h2 style={{ margin:0, color:C.text }}>🛒 {t.depenses.title}</h2>
-          <div style={{ color:C.amber, fontWeight:700, fontSize:14 }}>Total: {total.toLocaleString()} DA</div>
+          <h2 style={{ margin:0, color:C.text }}>🛒 Dépenses</h2>
+          <div style={{ color:C.amber, fontWeight:700, fontSize:14 }}>Total : {total.toLocaleString()} DA</div>
         </div>
-        {isAdmin && <button onClick={()=>setShowForm(true)} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:8, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ {t.depenses.add}</button>}
+        {isAdmin && <button onClick={()=>setShowForm(true)} style={btnStyle(C.accent,"#0f172a")}>+ Dépense</button>}
       </div>
 
       {showForm && (
         <div style={{ ...cardStyle, borderColor:C.accent }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
-            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:12, color:C.sub }}>{t.depenses.designation}</label><input style={inputStyle} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.depenses.amount}</label><input type="number" style={inputStyle} value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.depenses.date}</label><input type="date" style={inputStyle} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:11, color:C.sub }}>Désignation</label><input style={inputStyle} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Montant (DA)</label><input type="number" style={inputStyle} value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Date</label><input type="date" style={inputStyle} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} /></div>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.depenses.category}</label>
+              <label style={{ fontSize:11, color:C.sub }}>Catégorie</label>
               <select style={inputStyle} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
-                {t.depenses.categories.map(c=><option key={c}>{c}</option>)}
+                {CATS.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.depenses.photo}</label>
+              <label style={{ fontSize:11, color:C.sub }}>Photo/Facture</label>
               <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handlePhoto} />
-              <button onClick={()=>fileRef.current.click()} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 12px", cursor:"pointer", width:"100%", fontSize:13 }}>
-                📷 {form.photo?"✅ Photo ajoutée":t.depenses.addPhoto}
+              <button onClick={()=>fileRef.current.click()} style={{ ...btnStyle(), width:"100%" }}>
+                {form.photo?"✅ Photo ajoutée":"📷 Ajouter photo"}
               </button>
             </div>
-            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:12, color:C.sub }}>{t.depenses.note}</label><input style={inputStyle} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} /></div>
+            <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:11, color:C.sub }}>Note</label><input style={inputStyle} value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} /></div>
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={save} style={{ background:C.green, border:"none", color:"#fff", borderRadius:6, padding:"7px 18px", fontWeight:700, cursor:"pointer" }}>{t.depenses.save}</button>
-            <button onClick={()=>setShowForm(false)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 18px", cursor:"pointer" }}>{t.depenses.cancel}</button>
+            <button onClick={save} style={btnStyle(C.green,"#fff")}>💾 Enregistrer</button>
+            <button onClick={()=>setShowForm(false)} style={btnStyle()}>Annuler</button>
           </div>
         </div>
       )}
@@ -467,18 +417,18 @@ function Depenses({ t, depenses, setDepenses, isAdmin, C, cardStyle }) {
       )}
 
       {depenses.map(d=>(
-        <div key={d.id} style={{ ...cardStyle, display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
+        <div key={d.id} style={{ ...cardStyle, display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, flexWrap:"wrap" }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight:700, color:C.text, fontSize:15 }}>{d.designation}</div>
+            <div style={{ fontWeight:700, color:C.text }}>{d.designation}</div>
             <div style={{ fontSize:12, color:C.sub, marginTop:3 }}>
               <span style={{ background:"#334155", borderRadius:4, padding:"2px 8px", marginRight:6 }}>{d.category}</span>
-              {d.date}
-              {d.note && <span style={{ marginLeft:8 }}>· {d.note}</span>}
+              {d.date}{d.note?` · ${d.note}`:""}
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            {d.photo && <button onClick={()=>setViewPhoto(d.photo)} style={{ background:"#334155", border:"none", color:C.accent, borderRadius:6, padding:"5px 10px", cursor:"pointer", fontSize:12 }}>🧾 {t.depenses.viewPhoto}</button>}
-            <div style={{ fontWeight:800, fontSize:16, color:C.amber }}>{Number(d.amount).toLocaleString()} DA</div>
+            {d.photo && <button onClick={()=>setViewPhoto(d.photo)} style={{ ...btnStyle(), color:C.accent, fontSize:12 }}>🧾 Facture</button>}
+            <span style={{ fontWeight:800, color:C.amber }}>{Number(d.amount).toLocaleString()} DA</span>
+            {isAdmin && <button onClick={()=>onDelete(d.id)} style={{ ...btnStyle("#7f1d1d","#fca5a5"), padding:"4px 8px", fontSize:11 }}>🗑️</button>}
           </div>
         </div>
       ))}
@@ -487,113 +437,107 @@ function Depenses({ t, depenses, setDepenses, isAdmin, C, cardStyle }) {
 }
 
 // ─── VOTES ────────────────────────────────────────────────────────────────────
-function Votes({ t, votes, setVotes, isAdmin, C, cardStyle }) {
+function Votes({ votes, isAdmin, onAdd, onClose, onCastVote, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ question:"", description:"", options:["Oui","Non"], deadline:"" });
   const [userVotes, setUserVotes] = useState({});
 
-  const inputStyle = { padding:"7px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
-
-  function saveVote() {
+  async function saveVote() {
     if (!form.question.trim()) return;
-    const newVote = { ...form, id:Date.now(), votes:{}, closed:false };
-    form.options.forEach((_,i)=>{ newVote.votes[i]=[]; });
-    setVotes(prev=>[newVote,...prev]);
+    const initV = {};
+    form.options.forEach((_,i)=>{ initV[i]=[]; });
+    await onAdd({...form, votes:initV, closed:false});
     setShowForm(false);
     setForm({ question:"", description:"", options:["Oui","Non"], deadline:"" });
   }
 
-  function castVote(voteId, optIdx) {
+  async function castVote(voteId, optIdx) {
     if (userVotes[voteId]!==undefined) return;
     setUserVotes(prev=>({...prev,[voteId]:optIdx}));
-    setVotes(prev=>prev.map(v=>v.id===voteId?{...v,votes:{...v.votes,[optIdx]:[...(v.votes[optIdx]||[]),1]}}:v));
+    await onCastVote(voteId, optIdx);
   }
 
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:8 }}>
-        <h2 style={{ margin:0, color:C.text }}>🗳️ {t.votes.title}</h2>
-        {isAdmin && <button onClick={()=>setShowForm(true)} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:8, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ {t.votes.add}</button>}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+        <h2 style={{ margin:0, color:C.text }}>🗳️ Sondages</h2>
+        {isAdmin && <button onClick={()=>setShowForm(true)} style={btnStyle(C.accent,"#0f172a")}>+ Créer</button>}
       </div>
-      <p style={{ color:C.sub, fontSize:13, marginTop:-8 }}>👥 {t.votes.majority} (37 locataires)</p>
 
       {showForm && (
         <div style={{ ...cardStyle, borderColor:C.accent }}>
-          <div style={{ display:"grid", gap:10, marginBottom:10 }}>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.votes.question}</label><input style={inputStyle} value={form.question} onChange={e=>setForm(f=>({...f,question:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.votes.description}</label><input style={inputStyle} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
+          <div style={{ display:"grid", gap:8, marginBottom:10 }}>
+            <div><label style={{ fontSize:11, color:C.sub }}>Question</label><input style={inputStyle} value={form.question} onChange={e=>setForm(f=>({...f,question:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Description</label><input style={inputStyle} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
             <div>
-              <label style={{ fontSize:12, color:C.sub }}>{t.votes.options}</label>
+              <label style={{ fontSize:11, color:C.sub }}>Options</label>
               {form.options.map((opt,i)=>(
                 <div key={i} style={{ display:"flex", gap:6, marginBottom:5 }}>
                   <input style={{ ...inputStyle, flex:1 }} value={opt} onChange={e=>setForm(f=>({...f,options:f.options.map((o,j)=>j===i?e.target.value:o)}))} />
-                  {form.options.length>2 && <button onClick={()=>setForm(f=>({...f,options:f.options.filter((_,j)=>j!==i)}))} style={{ background:"#7f1d1d", border:"none", color:"#fca5a5", borderRadius:4, padding:"4px 8px", cursor:"pointer" }}>✕</button>}
+                  {form.options.length>2 && <button onClick={()=>setForm(f=>({...f,options:f.options.filter((_,j)=>j!==i)}))} style={{ ...btnStyle("#7f1d1d","#fca5a5"), padding:"4px 8px" }}>✕</button>}
                 </div>
               ))}
-              <button onClick={()=>setForm(f=>({...f,options:[...f.options,""]}))} style={{ background:"#334155", border:"none", color:C.text, borderRadius:4, padding:"5px 12px", cursor:"pointer", fontSize:12 }}>+ {t.votes.addOption}</button>
+              <button onClick={()=>setForm(f=>({...f,options:[...f.options,""]}))} style={{ ...btnStyle(), fontSize:12 }}>+ Option</button>
             </div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.votes.deadline}</label><input type="date" style={inputStyle} value={form.deadline} onChange={e=>setForm(f=>({...f,deadline:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Date limite</label><input type="date" style={inputStyle} value={form.deadline} onChange={e=>setForm(f=>({...f,deadline:e.target.value}))} /></div>
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={saveVote} style={{ background:C.green, border:"none", color:"#fff", borderRadius:6, padding:"7px 18px", fontWeight:700, cursor:"pointer" }}>{t.votes.save}</button>
-            <button onClick={()=>setShowForm(false)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 18px", cursor:"pointer" }}>{t.votes.cancel}</button>
+            <button onClick={saveVote} style={btnStyle(C.green,"#fff")}>💾 Créer</button>
+            <button onClick={()=>setShowForm(false)} style={btnStyle()}>Annuler</button>
           </div>
         </div>
       )}
 
       {votes.map(v=>{
-        const totalVotes = Object.values(v.votes).flat().length;
-        const maxVotes = Math.max(...Object.values(v.votes).map(arr=>arr.length),1);
-        const winnerEntry = Object.entries(v.votes).sort((a,b)=>b[1].length-a[1].length)[0];
-        const winnerIdx = winnerEntry?.[0];
-        const winnerCount = v.votes[winnerIdx]?.length||0;
-        const approved = winnerCount >= 19 && winnerIdx==="0";
+        const totalV = Object.values(v.votes||{}).flat().length;
+        const winnerIdx = Object.entries(v.votes||{}).sort((a,b)=>b[1].length-a[1].length)[0]?.[0];
+        const winnerCount = v.votes?.[winnerIdx]?.length||0;
         const myVote = userVotes[v.id];
 
         return (
           <div key={v.id} style={{ ...cardStyle, borderLeft:`4px solid ${v.closed?"#475569":C.accent2}` }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8, marginBottom:8 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8, marginBottom:10 }}>
               <div>
-                <div style={{ fontWeight:700, fontSize:16, color:C.text }}>{v.question}</div>
-                {v.description && <div style={{ color:C.sub, fontSize:13, marginTop:3 }}>{v.description}</div>}
-                {v.deadline && <div style={{ color:C.sub, fontSize:12, marginTop:4 }}>📅 {v.deadline}</div>}
+                <div style={{ fontWeight:700, fontSize:15, color:C.text }}>{v.question}</div>
+                {v.description && <div style={{ color:C.sub, fontSize:12, marginTop:2 }}>{v.description}</div>}
+                {v.deadline && <div style={{ color:C.sub, fontSize:11, marginTop:3 }}>📅 {v.deadline}</div>}
               </div>
               <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                <span style={{ background:v.closed?"#33415566":C.accent2+"22", color:v.closed?C.sub:C.accent2, border:`1px solid ${v.closed?"#47556944":C.accent2+"44"}`, borderRadius:20, padding:"3px 10px", fontSize:12, fontWeight:700 }}>
-                  {v.closed?t.votes.closed:t.votes.open}
+                <span style={{ background:v.closed?"#33415566":C.accent2+"22", color:v.closed?C.sub:C.accent2, border:`1px solid ${v.closed?"#47556944":C.accent2+"44"}`, borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:700 }}>
+                  {v.closed?"Clôturé":"Ouvert"}
                 </span>
-                {isAdmin && !v.closed && <button onClick={()=>setVotes(prev=>prev.map(vv=>vv.id===v.id?{...vv,closed:true}:vv))} style={{ background:"#334155", border:"none", color:C.sub, borderRadius:6, padding:"4px 10px", cursor:"pointer", fontSize:12 }}>{t.votes.close}</button>}
+                {isAdmin && !v.closed && <button onClick={()=>onClose(v.id)} style={{ ...btnStyle(), fontSize:11, padding:"3px 8px" }}>🔒 Clôturer</button>}
+                {isAdmin && <button onClick={()=>onDelete(v.id)} style={{ ...btnStyle("#7f1d1d","#fca5a5"), fontSize:11, padding:"3px 8px" }}>🗑️</button>}
               </div>
             </div>
 
-            <div style={{ marginBottom:8 }}>
-              {v.options.map((opt,i)=>{
-                const count = (v.votes[i]||[]).length;
-                const pct = totalVotes>0?Math.round((count/totalVotes)*100):0;
-                return (
-                  <div key={i} style={{ marginBottom:8 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                      <span style={{ fontSize:13, color:C.text }}>{opt}</span>
-                      <span style={{ fontSize:12, color:C.sub }}>{count} {t.votes.votes_count} ({pct}%)</span>
-                    </div>
-                    <div style={{ background:"#334155", borderRadius:4, height:8, position:"relative" }}>
-                      <div style={{ background:i===0?C.green:C.red, width:`${pct}%`, height:8, borderRadius:4, transition:"width .3s" }} />
-                    </div>
-                    {!v.closed && myVote===undefined && (
-                      <button onClick={()=>castVote(v.id,i)} style={{ background:i===0?"#14532d":"#7f1d1d", border:"none", color:i===0?C.green:"#fca5a5", borderRadius:4, padding:"4px 12px", cursor:"pointer", fontSize:12, marginTop:4 }}>
-                        👆 {t.votes.vote}
-                      </button>
-                    )}
-                    {myVote===i && <span style={{ fontSize:12, color:C.green, marginTop:4, display:"block" }}>✅ {t.votes.voted}</span>}
+            {(v.options||[]).map((opt,i)=>{
+              const count = (v.votes?.[i]||[]).length;
+              const pct = totalV>0?Math.round((count/totalV)*100):0;
+              return (
+                <div key={i} style={{ marginBottom:8 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:3 }}>
+                    <span style={{ color:C.text }}>{opt}</span>
+                    <span style={{ color:C.sub }}>{count} voix ({pct}%)</span>
                   </div>
-                );
-              })}
-            </div>
+                  <div style={{ background:"#334155", borderRadius:4, height:8 }}>
+                    <div style={{ background:i===0?C.green:C.red, width:`${pct}%`, height:8, borderRadius:4, transition:"width .3s" }} />
+                  </div>
+                  {!v.closed && myVote===undefined && (
+                    <button onClick={()=>castVote(v.id,i)} style={{ ...btnStyle(i===0?"#14532d":"#7f1d1d", i===0?C.green:"#fca5a5"), fontSize:11, padding:"3px 10px", marginTop:4 }}>
+                      👆 Voter
+                    </button>
+                  )}
+                  {myVote===i && <span style={{ fontSize:11, color:C.green, marginTop:3, display:"block" }}>✅ Voté</span>}
+                </div>
+              );
+            })}
 
-            {(v.closed || totalVotes>=19) && (
-              <div style={{ background:approved?"#14532d33":"#7f1d1d33", border:`1px solid ${approved?C.green:C.red}44`, borderRadius:8, padding:"8px 12px", marginTop:8 }}>
-                <span style={{ fontWeight:700, color:approved?C.green:C.red }}>{t.votes.winner}: {approved?t.votes.approved:t.votes.rejected}</span>
-                <span style={{ color:C.sub, fontSize:12, marginLeft:8 }}>({winnerCount} {t.votes.votes_count})</span>
+            {winnerCount>=19 && (
+              <div style={{ background:winnerIdx==="0"?"#14532d33":"#7f1d1d33", border:`1px solid ${winnerIdx==="0"?C.green:C.red}44`, borderRadius:6, padding:"6px 10px", marginTop:6 }}>
+                <span style={{ fontWeight:700, color:winnerIdx==="0"?C.green:C.red }}>
+                  {winnerIdx==="0"?"✅ Approuvé":"❌ Rejeté"} · {winnerCount} voix
+                </span>
               </div>
             )}
           </div>
@@ -604,44 +548,42 @@ function Votes({ t, votes, setVotes, isAdmin, C, cardStyle }) {
 }
 
 // ─── ANNONCES ─────────────────────────────────────────────────────────────────
-function Annonces({ t, annonces, setAnnonces, isAdmin, C, cardStyle }) {
+function Annonces({ annonces, isAdmin, onAdd, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title:"", message:"", urgent:false, date:new Date().toISOString().split("T")[0] });
 
-  const inputStyle = { padding:"7px 10px", borderRadius:6, border:`1px solid #334155`, background:"#0f172a", color:"#f1f5f9", fontSize:13, width:"100%", boxSizing:"border-box" };
-
-  function save() {
+  async function save() {
     if (!form.title.trim() || !form.message.trim()) return;
-    setAnnonces(prev=>[{ ...form, id:Date.now() }, ...prev]);
+    await onAdd({...form});
     setShowForm(false);
     setForm({ title:"", message:"", urgent:false, date:new Date().toISOString().split("T")[0] });
   }
 
   function share(ann) {
-    const text = `${t.annonces.shareMsg}*${ann.title}*\n${ann.message}\n\n🏢 ${t.appTitle}`;
+    const text = `📢 ANNONCE IMMEUBLE :\n*${ann.title}*\n${ann.message}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   return (
     <div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:8 }}>
-        <h2 style={{ margin:0, color:C.text }}>📢 {t.annonces.title}</h2>
-        {isAdmin && <button onClick={()=>setShowForm(true)} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:8, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ {t.annonces.add}</button>}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+        <h2 style={{ margin:0, color:C.text }}>📢 Annonces</h2>
+        {isAdmin && <button onClick={()=>setShowForm(true)} style={btnStyle(C.accent,"#0f172a")}>+ Nouvelle</button>}
       </div>
 
       {showForm && (
         <div style={{ ...cardStyle, borderColor:C.accent }}>
-          <div style={{ display:"grid", gap:10, marginBottom:10 }}>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.annonces.messageTitle}</label><input style={inputStyle} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} /></div>
-            <div><label style={{ fontSize:12, color:C.sub }}>{t.annonces.message}</label><textarea style={{ ...inputStyle, minHeight:80, resize:"vertical" }} value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} /></div>
+          <div style={{ display:"grid", gap:8, marginBottom:10 }}>
+            <div><label style={{ fontSize:11, color:C.sub }}>Titre</label><input style={inputStyle} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} /></div>
+            <div><label style={{ fontSize:11, color:C.sub }}>Message</label><textarea style={{ ...inputStyle, minHeight:80, resize:"vertical" }} value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} /></div>
             <label style={{ fontSize:13, color:C.text, display:"flex", alignItems:"center", gap:6, cursor:"pointer" }}>
               <input type="checkbox" checked={form.urgent} onChange={e=>setForm(f=>({...f,urgent:e.target.checked}))} />
-              ⚡ {t.annonces.urgent}
+              ⚡ Urgent
             </label>
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <button onClick={save} style={{ background:C.green, border:"none", color:"#fff", borderRadius:6, padding:"7px 18px", fontWeight:700, cursor:"pointer" }}>{t.annonces.save}</button>
-            <button onClick={()=>setShowForm(false)} style={{ background:"#334155", border:"none", color:C.text, borderRadius:6, padding:"7px 18px", cursor:"pointer" }}>{t.annonces.cancel}</button>
+            <button onClick={save} style={btnStyle(C.green,"#fff")}>📣 Publier</button>
+            <button onClick={()=>setShowForm(false)} style={btnStyle()}>Annuler</button>
           </div>
         </div>
       )}
@@ -651,15 +593,16 @@ function Annonces({ t, annonces, setAnnonces, isAdmin, C, cardStyle }) {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
             <div style={{ flex:1 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-                {ann.urgent && <span style={{ background:C.red, color:"#fff", borderRadius:4, padding:"2px 8px", fontSize:11, fontWeight:800 }}>{t.annonces.urgentBadge}</span>}
-                <span style={{ fontWeight:700, fontSize:16, color:C.text }}>{ann.title}</span>
-                <span style={{ color:C.sub, fontSize:12 }}>· {ann.date}</span>
+                {ann.urgent && <span style={{ background:C.red, color:"#fff", borderRadius:4, padding:"1px 8px", fontSize:11, fontWeight:800 }}>⚡ URGENT</span>}
+                <span style={{ fontWeight:700, fontSize:15, color:C.text }}>{ann.title}</span>
+                <span style={{ color:C.sub, fontSize:11 }}>· {ann.date}</span>
               </div>
-              <p style={{ color:"#cbd5e1", margin:0, lineHeight:1.6 }}>{ann.message}</p>
+              <p style={{ color:"#cbd5e1", margin:0, fontSize:13, lineHeight:1.6 }}>{ann.message}</p>
             </div>
-            <button onClick={()=>share(ann)} style={{ background:"#14532d", border:"none", color:C.green, borderRadius:8, padding:"8px 12px", cursor:"pointer", fontWeight:700, fontSize:12, whiteSpace:"nowrap" }}>
-              📲 {t.annonces.share}
-            </button>
+            <div style={{ display:"flex", gap:6, flexDirection:"column" }}>
+              <button onClick={()=>share(ann)} style={{ ...btnStyle("#14532d",C.green), fontSize:12 }}>📲 WhatsApp</button>
+              {isAdmin && <button onClick={()=>onDelete(ann.id)} style={{ ...btnStyle("#7f1d1d","#fca5a5"), fontSize:11 }}>🗑️ Supprimer</button>}
+            </div>
           </div>
         </div>
       ))}
@@ -669,27 +612,37 @@ function Annonces({ t, annonces, setAnnonces, isAdmin, C, cardStyle }) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
-  const [lang, setLang] = useState("fr");
-  const t = T[lang];
-  const isRTL = lang === "ar";
-
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
   const [tab, setTab] = useState("dashboard");
+  const [loading, setLoading] = useState(true);
 
-  const [tenants, setTenants] = useLocalStorage("imm_tenants", initTenants());
-  const [payments, setPayments] = useLocalStorage("imm_payments", []);
-  const [depenses, setDepenses] = useLocalStorage("imm_depenses", [
-    { id:1, designation:"Ampoules hall + escaliers", amount:4500, date:"2026-03-15", category:"Électricité", photo:null, note:"" },
-    { id:2, designation:"Produits nettoyage", amount:2000, date:"2026-02-10", category:"Nettoyage", photo:null, note:"" },
-    { id:3, designation:"Réparation interphone", amount:8000, date:"2026-01-20", category:"Entretien", photo:null, note:"" },
-  ]);
-  const [votes, setVotes] = useLocalStorage("imm_votes", [
-    { id:1, question:"Installer une caméra de surveillance à l'entrée", description:"Améliorer la sécurité de l'immeuble", options:["Oui, je suis pour","Non, je suis contre"], votes:{0:[],1:[]}, deadline:"2026-06-30", closed:false },
-  ]);
-  const [annonces, setAnnonces] = useLocalStorage("imm_annonces", SAMPLE_ANNOUNCEMENTS);
+  const [tenants, setTenants] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [depenses, setDepenses] = useState([]);
+  const [votes, setVotes] = useState([]);
+  const [annonces, setAnnonces] = useState([]);
+
+  useEffect(() => {
+    loadDB().then(data => {
+      if (data.tenants.length > 0) {
+        setTenants(data.tenants); setPayments(data.payments);
+        setDepenses(data.depenses); setVotes(data.votes); setAnnonces(data.annonces);
+        setLoading(false);
+      } else {
+        const defaultTenants = initTenants();
+        supabase.from("tenants").insert(defaultTenants).then(() => {
+          loadDB().then(d2 => {
+            setTenants(d2.tenants); setPayments(d2.payments);
+            setDepenses(d2.depenses); setVotes(d2.votes); setAnnonces(d2.annonces);
+            setLoading(false);
+          });
+        });
+      }
+    });
+  }, []);
 
   function tryLogin() {
     if (ADMIN_PASSWORDS.includes(pwInput.trim())) {
@@ -697,92 +650,128 @@ function App() {
     } else { setPwError(true); }
   }
 
-  // Si on se déconnecte et qu'on est sur un onglet admin-only → retour dashboard
   function doLogout() {
     setIsAdmin(false);
     if (["tenants","depenses"].includes(tab)) setTab("dashboard");
   }
 
-  const C = {
-    bg:"#0f172a", card:"#1e293b", border:"#334155",
-    accent:"#38bdf8", accent2:"#818cf8",
-    text:"#f1f5f9", sub:"#94a3b8",
-    green:"#22c55e", red:"#ef4444", amber:"#f59e0b",
-  };
+  // ── Supabase actions ──
+  async function addTenant(t) { const {data}=await supabase.from("tenants").insert([t]).select(); if(data) setTenants(p=>[...p,data[0]]); }
+  async function updateTenant(id,u) { await supabase.from("tenants").update(u).eq("id",id); setTenants(p=>p.map(t=>t.id===id?{...t,...u}:t)); }
+  async function deleteTenant(id) { await supabase.from("tenants").delete().eq("id",id); setTenants(p=>p.filter(t=>t.id!==id)); }
 
-  const cardStyle = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:16 };
+  async function addPayment(pay) { const {data}=await supabase.from("payments").insert([pay]).select(); if(data) setPayments(p=>[...p,data[0]]); }
+  async function deletePayment(id) { await supabase.from("payments").delete().eq("id",id); setPayments(p=>p.filter(x=>x.id!==id)); }
+
+  async function addDepense(d) { const {data}=await supabase.from("depenses").insert([d]).select(); if(data) setDepenses(p=>[data[0],...p]); }
+  async function deleteDepense(id) { await supabase.from("depenses").delete().eq("id",id); setDepenses(p=>p.filter(x=>x.id!==id)); }
+
+  async function addVote(v) { const {data}=await supabase.from("votes").insert([v]).select(); if(data) setVotes(p=>[data[0],...p]); }
+  async function closeVote(id) { await supabase.from("votes").update({closed:true}).eq("id",id); setVotes(p=>p.map(v=>v.id===id?{...v,closed:true}:v)); }
+  async function deleteVote(id) { await supabase.from("votes").delete().eq("id",id); setVotes(p=>p.filter(v=>v.id!==id)); }
+  async function castVoteDB(voteId, optIdx) {
+    const vote = votes.find(v=>v.id===voteId);
+    if (!vote) return;
+    const newV = {...vote.votes, [optIdx]:[...(vote.votes[optIdx]||[]),1]};
+    await supabase.from("votes").update({votes:newV}).eq("id",voteId);
+    setVotes(p=>p.map(v=>v.id===voteId?{...v,votes:newV}:v));
+  }
+
+  async function addAnnonce(a) { const {data}=await supabase.from("annonces").insert([a]).select(); if(data) setAnnonces(p=>[data[0],...p]); }
+  async function deleteAnnonce(id) { await supabase.from("annonces").delete().eq("id",id); setAnnonces(p=>p.filter(x=>x.id!==id)); }
+
+  // Solde caisse
+  const totalPaid = payments.reduce((s,p)=>s+Number(p.amount),0) + tenants.reduce((s,t)=>s+Number(t.priorCredit||0),0);
+  const totalSpent = depenses.reduce((s,d)=>s+Number(d.amount),0);
+  const caisse = totalPaid - totalSpent;
+
+  if (loading) return (
+    <div style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+      <div style={{ fontSize:48 }}>🏢</div>
+      <div style={{ color:C.accent, fontSize:18, fontWeight:700 }}>Chargement...</div>
+      <div style={{ color:C.sub, fontSize:13 }}>Connexion à la base de données</div>
+    </div>
+  );
 
   if (showLogin) return (
-    <div dir={isRTL?"rtl":"ltr"} style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"system-ui, sans-serif" }}>
-      <div style={{ ...cardStyle, width:340, textAlign:"center" }}>
+    <div style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ ...cardStyle, width:320, textAlign:"center" }}>
         <div style={{ fontSize:40, marginBottom:8 }}>🔐</div>
-        <h2 style={{ color:C.text, margin:"0 0 20px" }}>{t.login}</h2>
-        <input type="password" placeholder={t.password} value={pwInput}
+        <h2 style={{ color:C.text, margin:"0 0 16px" }}>Connexion Admin</h2>
+        <input type="password" placeholder="Mot de passe" value={pwInput}
           onChange={e=>{ setPwInput(e.target.value); setPwError(false); }}
           onKeyDown={e=>e.key==="Enter"&&tryLogin()}
-          style={{ width:"100%", padding:10, borderRadius:8, border:`1px solid ${pwError?C.red:C.border}`, background:"#0f172a", color:C.text, fontSize:15, boxSizing:"border-box", marginBottom:8, outline:"none" }} />
-        {pwError && <p style={{ color:C.red, margin:"0 0 8px", fontSize:13 }}>{t.wrongPassword}</p>}
-        <button onClick={tryLogin} style={{ width:"100%", padding:10, background:C.accent, color:"#0f172a", border:"none", borderRadius:8, fontWeight:700, fontSize:15, cursor:"pointer", marginBottom:10 }}>{t.loginBtn}</button>
-        <button onClick={()=>setShowLogin(false)} style={{ background:"none", border:"none", color:C.sub, cursor:"pointer", fontSize:13 }}>← {t.nav.dashboard}</button>
-        <p style={{ color:C.sub, fontSize:11, marginTop:12 }}>Mots de passe : admin123 / admin456 / admin789</p>
+          style={{ ...inputStyle, marginBottom:8, fontSize:15, outline:"none", borderColor:pwError?C.red:C.border }} />
+        {pwError && <p style={{ color:C.red, margin:"0 0 8px", fontSize:13 }}>Mot de passe incorrect</p>}
+        <button onClick={tryLogin} style={{ ...btnStyle(C.accent,"#0f172a"), width:"100%", padding:10, fontSize:15, marginBottom:8 }}>Se connecter</button>
+        <button onClick={()=>setShowLogin(false)} style={{ background:"none", border:"none", color:C.sub, cursor:"pointer", fontSize:13 }}>← Retour</button>
       </div>
     </div>
   );
 
+  const NAV = [
+    { key:"dashboard", label:"Tableau de bord", icon:"📊" },
+    { key:"cotisations", label:"Cotisations", icon:"💰" },
+    { key:"votes", label:"Sondages", icon:"🗳️" },
+    { key:"annonces", label:"Annonces", icon:"📢" },
+    ...(isAdmin ? [
+      { key:"tenants", label:"Locataires", icon:"👥" },
+      { key:"depenses", label:"Dépenses", icon:"🛒" },
+    ] : []),
+  ];
+
   return (
-    <div dir={isRTL?"rtl":"ltr"} style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"system-ui, sans-serif", display:"flex", flexDirection:"column" }}>
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"system-ui, sans-serif", display:"flex", flexDirection:"column" }}>
       {/* HEADER */}
-      <header style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"12px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+      <header style={{ background:C.card, borderBottom:`1px solid ${C.border}`, padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:28 }}>🏢</span>
+          <span style={{ fontSize:26 }}>🏢</span>
           <div>
-            <div style={{ fontWeight:800, fontSize:18, color:C.accent }}>{t.appTitle}</div>
-            <div style={{ fontSize:12, color:C.sub }}>{t.appSubtitle}</div>
+            <div style={{ fontWeight:800, fontSize:16, color:C.accent }}>Gestion Immeuble</div>
+            <div style={{ fontSize:11, color:C.sub }}>Caisse & Cotisations</div>
           </div>
         </div>
-        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-          <button onClick={()=>setLang(lang==="fr"?"ar":"fr")} style={{ background:"#334155", border:"none", color:C.text, borderRadius:20, padding:"4px 14px", cursor:"pointer", fontWeight:700, fontSize:13 }}>
-            {lang==="fr"?"🇩🇿 عربية":"🇫🇷 Français"}
-          </button>
+        {/* Solde caisse visible dans header */}
+        <div style={{ background:caisse>=0?"#14532d33":"#7f1d1d33", border:`1px solid ${caisse>=0?C.green:C.red}44`, borderRadius:8, padding:"4px 12px", textAlign:"center" }}>
+          <div style={{ fontSize:10, color:C.sub }}>💰 Solde caisse</div>
+          <div style={{ fontWeight:800, color:caisse>=0?C.green:C.red, fontSize:14 }}>{caisse.toLocaleString()} DA</div>
+        </div>
+        <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
           {isAdmin ? (
             <>
-              <span style={{ background:C.accent+"22", color:C.accent, border:`1px solid ${C.accent}44`, borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>⚙️ {t.adminMode}</span>
-              <button onClick={doLogout} style={{ background:"#334155", border:"none", color:C.text, borderRadius:20, padding:"4px 14px", cursor:"pointer", fontSize:13 }}>{t.logout}</button>
+              <span style={{ background:C.accent+"22", color:C.accent, border:`1px solid ${C.accent}44`, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:700 }}>⚙️ Admin</span>
+              <button onClick={doLogout} style={{ ...btnStyle(), borderRadius:20, padding:"4px 12px" }}>Déconnexion</button>
             </>
           ) : (
             <>
-              <span style={{ background:"#33415544", color:C.sub, borderRadius:20, padding:"4px 12px", fontSize:12 }}>👁 {t.viewMode}</span>
-              <button onClick={()=>setShowLogin(true)} style={{ background:C.accent, border:"none", color:"#0f172a", borderRadius:20, padding:"4px 14px", cursor:"pointer", fontWeight:700, fontSize:13 }}>🔐 Admin</button>
+              <span style={{ background:"#33415544", color:C.sub, borderRadius:20, padding:"3px 10px", fontSize:11 }}>👁 Consultation</span>
+              <button onClick={()=>setShowLogin(true)} style={{ ...btnStyle(C.accent,"#0f172a"), borderRadius:20, padding:"4px 12px" }}>🔐 Admin</button>
             </>
           )}
         </div>
       </header>
 
       {/* NAV */}
-      <nav style={{ background:C.card, borderBottom:`1px solid ${C.border}`, display:"flex", gap:4, padding:"6px 12px", overflowX:"auto" }}>
-        {Object.entries(t.nav).map(([key,label])=>{
-          const adminOnly = ["tenants","depenses"];
-          if (!isAdmin && adminOnly.includes(key)) return null;
-          return (
-            <button key={key} onClick={()=>setTab(key)} style={{ background:tab===key?C.accent:"transparent", color:tab===key?"#0f172a":C.sub, border:"none", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontWeight:tab===key?700:400, fontSize:13, whiteSpace:"nowrap", transition:"all .15s" }}>
-              {{"dashboard":"📊","tenants":"👥","cotisations":"💰","depenses":"🛒","votes":"🗳️","annonces":"📢"}[key]} {label}
-            </button>
-          );
-        })}
+      <nav style={{ background:C.card, borderBottom:`1px solid ${C.border}`, display:"flex", gap:2, padding:"6px 10px", overflowX:"auto" }}>
+        {NAV.map(({key,label,icon})=>(
+          <button key={key} onClick={()=>setTab(key)} style={{ background:tab===key?C.accent:"transparent", color:tab===key?"#0f172a":C.sub, border:"none", borderRadius:8, padding:"7px 12px", cursor:"pointer", fontWeight:tab===key?700:400, fontSize:12, whiteSpace:"nowrap", transition:"all .15s" }}>
+            {icon} {label}
+          </button>
+        ))}
       </nav>
 
       {/* CONTENT */}
-      <main style={{ flex:1, padding:16, maxWidth:900, width:"100%", margin:"0 auto", boxSizing:"border-box" }}>
-        {tab==="dashboard"    && <Dashboard t={t} tenants={tenants} payments={payments} depenses={depenses} votes={votes} annonces={annonces} C={C} cardStyle={cardStyle} />}
-        {tab==="tenants"      && <Tenants t={t} tenants={tenants} setTenants={setTenants} isAdmin={isAdmin} C={C} cardStyle={cardStyle} />}
-        {tab==="cotisations"  && <Cotisations t={t} tenants={tenants} payments={payments} setPayments={setPayments} isAdmin={isAdmin} C={C} cardStyle={cardStyle} />}
-        {tab==="depenses"     && <Depenses t={t} depenses={depenses} setDepenses={setDepenses} isAdmin={isAdmin} C={C} cardStyle={cardStyle} />}
-        {tab==="votes"        && <Votes t={t} votes={votes} setVotes={setVotes} isAdmin={isAdmin} C={C} cardStyle={cardStyle} />}
-        {tab==="annonces"     && <Annonces t={t} annonces={annonces} setAnnonces={setAnnonces} isAdmin={isAdmin} C={C} cardStyle={cardStyle} lang={lang} />}
+      <main style={{ flex:1, padding:14, maxWidth:900, width:"100%", margin:"0 auto", boxSizing:"border-box" }}>
+        {tab==="dashboard"   && <Dashboard tenants={tenants} payments={payments} depenses={depenses} votes={votes} annonces={annonces} />}
+        {tab==="tenants"     && <Tenants tenants={tenants} payments={payments} isAdmin={isAdmin} onAdd={addTenant} onUpdate={updateTenant} onDelete={deleteTenant} />}
+        {tab==="cotisations" && <Cotisations tenants={tenants} payments={payments} isAdmin={isAdmin} onAddPayment={addPayment} onDeletePayment={deletePayment} />}
+        {tab==="depenses"    && <Depenses depenses={depenses} isAdmin={isAdmin} onAdd={addDepense} onDelete={deleteDepense} />}
+        {tab==="votes"       && <Votes votes={votes} isAdmin={isAdmin} onAdd={addVote} onClose={closeVote} onCastVote={castVoteDB} onDelete={deleteVote} />}
+        {tab==="annonces"    && <Annonces annonces={annonces} isAdmin={isAdmin} onAdd={addAnnonce} onDelete={deleteAnnonce} />}
       </main>
 
-      <footer style={{ textAlign:"center", color:C.sub, fontSize:11, padding:"12px", borderTop:`1px solid ${C.border}` }}>
-        🏢 {t.appTitle} · 37 {t.tenants?.title} · 2026
+      <footer style={{ textAlign:"center", color:C.sub, fontSize:11, padding:10, borderTop:`1px solid ${C.border}` }}>
+        🏢 Gestion Immeuble · {tenants.length} locataires · 2026
       </footer>
     </div>
   );
